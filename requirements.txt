@@ -1,0 +1,8 @@
+firecrawl-py
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+apscheduler>=3.0
+python-dotenv>=1.0
+python-telegram-bot>=20.0
+loguru>=0.7
+pytest>=7.0
