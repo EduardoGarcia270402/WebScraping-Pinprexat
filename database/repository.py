@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from database.models import EjecucionLog, Funcionario, ItemCompra, LugarEntrega, Proceso
+from database.models import DocumentoAnexo, EjecucionLog, Funcionario, ItemCompra, LugarEntrega, Proceso, Proveedor
 
 
 PROCESO_FIELDS = (
@@ -21,7 +21,16 @@ PROCESO_FIELDS = (
 )
 FUNCIONARIO_FIELDS = ("nombre", "correo")
 LUGAR_FIELDS = ("provincia", "canton", "parroquia", "direccion")
-ITEM_FIELDS = ("numero", "cpc", "unidad", "cantidad")
+ITEM_FIELDS = ("numero", "cpc", "categoria_cpc", "descripcion_producto", "unidad", "cantidad")
+PROVEEDOR_FIELDS = ("numero", "ruc_id", "razon_social")
+DOCUMENTO_FIELDS = (
+    "descripcion_archivo",
+    "download_url",
+    "nombre_archivo",
+    "ruta_local",
+    "drive_file_id",
+    "drive_url",
+)
 
 
 @dataclass(frozen=True)
@@ -38,6 +47,8 @@ def get_proceso_by_codigo(session: Session, codigo_necesidad: str) -> Proceso | 
             selectinload(Proceso.funcionario),
             selectinload(Proceso.lugar_entrega),
             selectinload(Proceso.items_compra),
+            selectinload(Proceso.proveedores),
+            selectinload(Proceso.documentos_anexos),
         )
         .where(Proceso.codigo_necesidad == codigo_necesidad)
     )
@@ -74,6 +85,8 @@ def _build_proceso(data: dict[str, Any]) -> Proceso:
     proceso.funcionario = Funcionario(**_pick(data.get("funcionario") or {}, FUNCIONARIO_FIELDS))
     proceso.lugar_entrega = LugarEntrega(**_pick(data.get("lugar_entrega") or {}, LUGAR_FIELDS))
     proceso.items_compra = [_build_item(item) for item in data.get("items_compra") or []]
+    proceso.proveedores = [_build_proveedor(proveedor) for proveedor in data.get("proveedores") or []]
+    proceso.documentos_anexos = [_build_documento(documento) for documento in data.get("documentos_anexos") or []]
     return proceso
 
 
@@ -82,6 +95,14 @@ def _build_item(data: dict[str, Any]) -> ItemCompra:
     if values.get("cantidad") is not None:
         values["cantidad"] = Decimal(str(values["cantidad"]))
     return ItemCompra(**values)
+
+
+def _build_proveedor(data: dict[str, Any]) -> Proveedor:
+    return Proveedor(**_pick(data, PROVEEDOR_FIELDS))
+
+
+def _build_documento(data: dict[str, Any]) -> DocumentoAnexo:
+    return DocumentoAnexo(**_pick(data, DOCUMENTO_FIELDS))
 
 
 def _apply_proceso_changes(proceso: Proceso, data: dict[str, Any]) -> dict[str, tuple[Any, Any]]:
@@ -105,6 +126,14 @@ def _apply_proceso_changes(proceso: Proceso, data: dict[str, Any]) -> dict[str, 
     item_changes = _replace_items_if_changed(proceso, data.get("items_compra") or [])
     if item_changes is not None:
         cambios["items_compra"] = item_changes
+
+    proveedor_changes = _replace_proveedores_if_changed(proceso, data.get("proveedores") or [])
+    if proveedor_changes is not None:
+        cambios["proveedores"] = proveedor_changes
+
+    documento_changes = _replace_documentos_if_changed(proceso, data.get("documentos_anexos") or [])
+    if documento_changes is not None:
+        cambios["documentos_anexos"] = documento_changes
 
     return cambios
 
@@ -146,8 +175,73 @@ def _item_to_dict(item: ItemCompra) -> dict[str, Any]:
         {
             "numero": item.numero,
             "cpc": item.cpc,
+            "categoria_cpc": item.categoria_cpc,
+            "descripcion_producto": item.descripcion_producto,
             "unidad": item.unidad,
             "cantidad": item.cantidad,
+        }
+    )
+
+
+def _replace_proveedores_if_changed(
+    proceso: Proceso,
+    new_proveedores_data: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]] | None:
+    current_proveedores = [
+        _proveedor_to_dict(proveedor)
+        for proveedor in sorted(proceso.proveedores, key=lambda proveedor: proveedor.numero or 0)
+    ]
+    new_proveedores = [
+        _normalize_proveedor(proveedor)
+        for proveedor in sorted(new_proveedores_data, key=lambda proveedor: proveedor.get("numero") or 0)
+    ]
+
+    if current_proveedores == new_proveedores:
+        return None
+
+    proceso.proveedores = [_build_proveedor(proveedor) for proveedor in new_proveedores]
+    return current_proveedores, new_proveedores
+
+
+def _replace_documentos_if_changed(
+    proceso: Proceso,
+    new_documentos_data: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]] | None:
+    current_documentos = [
+        _documento_to_dict(documento)
+        for documento in sorted(proceso.documentos_anexos, key=lambda documento: documento.descripcion_archivo or "")
+    ]
+    new_documentos = [
+        _normalize_documento(documento)
+        for documento in sorted(new_documentos_data, key=lambda documento: documento.get("descripcion_archivo") or "")
+    ]
+
+    if current_documentos == new_documentos:
+        return None
+
+    proceso.documentos_anexos = [_build_documento(documento) for documento in new_documentos]
+    return current_documentos, new_documentos
+
+
+def _proveedor_to_dict(proveedor: Proveedor) -> dict[str, Any]:
+    return _normalize_proveedor(
+        {
+            "numero": proveedor.numero,
+            "ruc_id": proveedor.ruc_id,
+            "razon_social": proveedor.razon_social,
+        }
+    )
+
+
+def _documento_to_dict(documento: DocumentoAnexo) -> dict[str, Any]:
+    return _normalize_documento(
+        {
+            "descripcion_archivo": documento.descripcion_archivo,
+            "download_url": documento.download_url,
+            "nombre_archivo": documento.nombre_archivo,
+            "ruta_local": documento.ruta_local,
+            "drive_file_id": documento.drive_file_id,
+            "drive_url": documento.drive_url,
         }
     )
 
@@ -157,6 +251,14 @@ def _normalize_item(data: dict[str, Any]) -> dict[str, Any]:
     if values.get("cantidad") is not None:
         values["cantidad"] = Decimal(str(values["cantidad"]))
     return values
+
+
+def _normalize_proveedor(data: dict[str, Any]) -> dict[str, Any]:
+    return _pick(data, PROVEEDOR_FIELDS)
+
+
+def _normalize_documento(data: dict[str, Any]) -> dict[str, Any]:
+    return _pick(data, DOCUMENTO_FIELDS)
 
 
 def _pick(data: dict[str, Any], fields: Iterable[str]) -> dict[str, Any]:

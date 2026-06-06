@@ -43,6 +43,14 @@ class Proceso(Base):
         back_populates="proceso",
         cascade="all, delete-orphan",
     )
+    proveedores: Mapped[list[Proveedor]] = relationship(
+        back_populates="proceso",
+        cascade="all, delete-orphan",
+    )
+    documentos_anexos: Mapped[list[DocumentoAnexo]] = relationship(
+        back_populates="proceso",
+        cascade="all, delete-orphan",
+    )
 
 
 class Funcionario(Base):
@@ -76,10 +84,39 @@ class ItemCompra(Base):
     proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False)
     numero: Mapped[int | None] = mapped_column(Integer)
     cpc: Mapped[str | None] = mapped_column(String)
+    categoria_cpc: Mapped[str | None] = mapped_column(String)
+    descripcion_producto: Mapped[str | None] = mapped_column(Text)
     unidad: Mapped[str | None] = mapped_column(String)
     cantidad: Mapped[Decimal | None] = mapped_column(Numeric)
 
     proceso: Mapped[Proceso] = relationship(back_populates="items_compra")
+
+
+class Proveedor(Base):
+    __tablename__ = "proveedores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False)
+    numero: Mapped[int | None] = mapped_column(Integer)
+    ruc_id: Mapped[str | None] = mapped_column(String)
+    razon_social: Mapped[str | None] = mapped_column(Text)
+
+    proceso: Mapped[Proceso] = relationship(back_populates="proveedores")
+
+
+class DocumentoAnexo(Base):
+    __tablename__ = "documentos_anexos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False)
+    descripcion_archivo: Mapped[str | None] = mapped_column(Text)
+    download_url: Mapped[str | None] = mapped_column(Text)
+    nombre_archivo: Mapped[str | None] = mapped_column(String)
+    ruta_local: Mapped[str | None] = mapped_column(Text)
+    drive_file_id: Mapped[str | None] = mapped_column(String)
+    drive_url: Mapped[str | None] = mapped_column(Text)
+
+    proceso: Mapped[Proceso] = relationship(back_populates="documentos_anexos")
 
 
 class EjecucionLog(Base):

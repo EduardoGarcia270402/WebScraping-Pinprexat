@@ -33,11 +33,36 @@ SELECT
     p.codigo_necesidad,
     i.numero,
     i.cpc,
+    i.categoria_cpc,
+    i.descripcion_producto,
     i.unidad,
     i.cantidad
 FROM procesos p
 JOIN items_compra i ON i.proceso_id = p.id
 ORDER BY p.id DESC, i.numero ASC;
+
+-- Ver proveedores guardados
+SELECT
+    p.codigo_necesidad,
+    pr.numero,
+    pr.ruc_id,
+    pr.razon_social
+FROM procesos p
+JOIN proveedores pr ON pr.proceso_id = p.id
+ORDER BY p.id DESC, pr.numero ASC;
+
+-- Ver documentos anexos guardados
+SELECT
+    p.codigo_necesidad,
+    d.descripcion_archivo,
+    d.download_url,
+    d.nombre_archivo,
+    d.ruta_local,
+    d.drive_file_id,
+    d.drive_url
+FROM procesos p
+JOIN documentos_anexos d ON d.proceso_id = p.id
+ORDER BY p.id DESC, d.descripcion_archivo ASC;
 
 -- Ver ultimas ejecuciones
 SELECT

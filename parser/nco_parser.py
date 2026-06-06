@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from html import unescape
@@ -46,7 +47,9 @@ def parse_nco_detail(raw_content: str) -> dict[str, Any]:
         field: _find_value(text, labels)
         for field, labels in LUGAR_LABELS.items()
     }
-    data["items_compra"] = _parse_items(text)
+    data["items_compra"] = _parse_items(raw_content, text)
+    data["documentos_anexos"] = _parse_documentos_anexos(raw_content)
+    data["proveedores"] = _parse_proveedores(raw_content)
     return data
 
 
@@ -78,7 +81,11 @@ def _find_value(text: str, labels: tuple[str, ...]) -> str | None:
     return None
 
 
-def _parse_items(text: str) -> list[dict[str, Any]]:
+def _parse_items(raw_content: str, text: str) -> list[dict[str, Any]]:
+    html_items = _parse_html_items(raw_content)
+    if html_items:
+        return html_items
+
     items: list[dict[str, Any]] = []
     lines = [line.strip() for line in text.splitlines() if line.strip()]
 
@@ -88,15 +95,9 @@ def _parse_items(text: str) -> list[dict[str, Any]]:
         normalized_cells = [_strip_accents(cell).lower() for cell in cells]
         if {"no.", "cpc", "unidad", "cantidad"}.issubset(set(normalized_cells)):
             continue
-        if len(cells) >= 4 and _looks_like_item(cells):
-            items.append(
-                {
-                    "numero": _parse_int(cells[0]),
-                    "cpc": cells[1],
-                    "unidad": cells[2],
-                    "cantidad": _parse_decimal(cells[3]),
-                }
-            )
+        item = _item_from_cells(cells)
+        if item:
+            items.append(item)
 
     if items:
         return items
@@ -118,8 +119,117 @@ def _parse_items(text: str) -> list[dict[str, Any]]:
     return items
 
 
-def _looks_like_item(cells: list[str]) -> bool:
-    return _parse_int(cells[0]) is not None and _parse_decimal(cells[3]) is not None
+def _parse_html_items(raw_content: str) -> list[dict[str, Any]]:
+    rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", raw_content, flags=re.IGNORECASE | re.DOTALL)
+    items: list[dict[str, Any]] = []
+
+    for row in rows:
+        cells = _extract_html_cells(row)
+        item = _item_from_cells(cells)
+        if item:
+            items.append(item)
+
+    return items
+
+
+def _parse_documentos_anexos(raw_content: str) -> list[dict[str, Any]]:
+    table = _find_section_table(raw_content, "Documentos Anexos")
+    if not table:
+        return []
+
+    documentos: list[dict[str, Any]] = []
+    rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", table, flags=re.IGNORECASE | re.DOTALL)
+    for row in rows:
+        href_match = re.search(r"<a\b[^>]*href=[\"'](?P<href>[^\"']+)[\"']", row, flags=re.IGNORECASE | re.DOTALL)
+        if not href_match:
+            continue
+
+        cells = _extract_html_cells(row)
+        if not cells:
+            continue
+
+        documentos.append(
+            {
+                "descripcion_archivo": cells[0],
+                "download_url": unescape(href_match.group("href")),
+            }
+        )
+
+    return documentos
+
+
+def _parse_proveedores(raw_content: str) -> list[dict[str, Any]]:
+    table = _find_section_table(raw_content, "Proveedores")
+    if not table:
+        return []
+
+    proveedores: list[dict[str, Any]] = []
+    rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", table, flags=re.IGNORECASE | re.DOTALL)
+    for row in rows:
+        cells = _extract_html_cells(row)
+        if len(cells) < 3:
+            continue
+
+        numero = _parse_int(cells[0])
+        if numero is None:
+            continue
+
+        proveedores.append(
+            {
+                "numero": numero,
+                "ruc_id": cells[1],
+                "razon_social": cells[2],
+            }
+        )
+
+    return proveedores
+
+
+def _find_section_table(raw_content: str, section_title: str) -> str | None:
+    headers = re.finditer(r"<h[1-6]\b[^>]*>(.*?)</h[1-6]>", raw_content, flags=re.IGNORECASE | re.DOTALL)
+    normalized_title = _normalize_match_text(section_title)
+    for header in headers:
+        header_text = _normalize_match_text(header.group(1))
+        if normalized_title not in header_text:
+            continue
+
+        table_match = re.search(r"<table\b[^>]*>.*?</table>", raw_content[header.end() :], flags=re.IGNORECASE | re.DOTALL)
+        if table_match:
+            return table_match.group(0)
+    return None
+
+
+def _extract_html_cells(row: str) -> list[str]:
+    raw_cells = re.findall(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", row, flags=re.IGNORECASE | re.DOTALL)
+    cells: list[str] = []
+    for cell in raw_cells:
+        cell = re.sub(r"<br\s*/?>", "\n", cell, flags=re.IGNORECASE)
+        cell = re.sub(r"<[^>]+>", " ", cell)
+        value = _clean_value(unescape(cell))
+        if value:
+            cells.append(value)
+    return cells
+
+
+def _item_from_cells(cells: list[str]) -> dict[str, Any] | None:
+    if len(cells) < 4:
+        return None
+
+    numero = _parse_int(cells[0])
+    cantidad = _parse_decimal(cells[-1])
+    if numero is None or cantidad is None:
+        return None
+
+    item = {
+        "numero": numero,
+        "cpc": cells[1],
+        "unidad": cells[-2],
+        "cantidad": cantidad,
+    }
+    if len(cells) >= 6:
+        item["categoria_cpc"] = cells[2]
+        item["descripcion_producto"] = cells[3]
+    return item
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -169,4 +279,17 @@ def _strip_accents(value: str) -> str:
         "áéíóúÁÉÍÓÚñÑüÜ",
         "aeiouAEIOUnNuU",
     )
-    return value.translate(replacements)
+    translated = value.translate(replacements)
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", translated)
+        if not unicodedata.combining(char)
+    )
+
+
+def _normalize_match_text(value: str) -> str:
+    text = unescape(value)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = _strip_accents(text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip().lower()

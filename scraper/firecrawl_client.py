@@ -29,19 +29,19 @@ def _extract_content(result: Any) -> str:
         return result
 
     if isinstance(result, dict):
-        for key in ("markdown", "html", "content"):
+        for key in ("html", "markdown", "content"):
             value = result.get(key)
             if value:
                 return str(value)
 
         data = result.get("data")
         if isinstance(data, dict):
-            for key in ("markdown", "html", "content"):
+            for key in ("html", "markdown", "content"):
                 value = data.get(key)
                 if value:
                     return str(value)
 
-    for key in ("markdown", "html", "content"):
+    for key in ("html", "markdown", "content"):
         value = getattr(result, key, None)
         if value:
             return str(value)

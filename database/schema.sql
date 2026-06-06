@@ -34,8 +34,29 @@ CREATE TABLE IF NOT EXISTS items_compra (
     proceso_id INTEGER NOT NULL REFERENCES procesos(id) ON DELETE CASCADE,
     numero INTEGER,
     cpc VARCHAR,
+    categoria_cpc VARCHAR,
+    descripcion_producto TEXT,
     unidad VARCHAR,
     cantidad NUMERIC
+);
+
+CREATE TABLE IF NOT EXISTS proveedores (
+    id SERIAL PRIMARY KEY,
+    proceso_id INTEGER NOT NULL REFERENCES procesos(id) ON DELETE CASCADE,
+    numero INTEGER,
+    ruc_id VARCHAR,
+    razon_social TEXT
+);
+
+CREATE TABLE IF NOT EXISTS documentos_anexos (
+    id SERIAL PRIMARY KEY,
+    proceso_id INTEGER NOT NULL REFERENCES procesos(id) ON DELETE CASCADE,
+    descripcion_archivo TEXT,
+    download_url TEXT,
+    nombre_archivo VARCHAR,
+    ruta_local TEXT,
+    drive_file_id VARCHAR,
+    drive_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ejecuciones_log (

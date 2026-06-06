@@ -78,6 +78,15 @@ class Settings:
     telegram_chat_id: str | None
     notifications_enabled: bool
     save_raw_responses: bool
+    download_documents: bool
+    documents_dir: Path
+    drive_upload_enabled: bool
+    drive_auth_mode: str
+    drive_service_account_file: Path | None
+    drive_oauth_client_file: Path | None
+    drive_oauth_token_file: Path
+    drive_folder_id: str | None
+    drive_folder_name: str
     schedule_hours: tuple[int, ...]
     targets_file: Path
     log_file: Path
@@ -111,6 +120,24 @@ def get_settings() -> Settings:
         telegram_chat_id=_getenv("TELEGRAM_CHAT_ID"),
         notifications_enabled=_getenv_bool("NOTIFICATIONS_ENABLED", False),
         save_raw_responses=_getenv_bool("SAVE_RAW_RESPONSES", False),
+        download_documents=_getenv_bool("DOWNLOAD_DOCUMENTS", True),
+        documents_dir=BASE_DIR / (_getenv("DOCUMENTS_DIR", "downloads/documentos_anexos") or "downloads/documentos_anexos"),
+        drive_upload_enabled=_getenv_bool("DRIVE_UPLOAD_ENABLED", False),
+        drive_auth_mode=_getenv("DRIVE_AUTH_MODE", "service_account") or "service_account",
+        drive_service_account_file=(
+            BASE_DIR / service_account_file
+            if (service_account_file := _getenv("DRIVE_SERVICE_ACCOUNT_FILE"))
+            else None
+        ),
+        drive_oauth_client_file=(
+            BASE_DIR / oauth_client_file
+            if (oauth_client_file := _getenv("DRIVE_OAUTH_CLIENT_FILE"))
+            else None
+        ),
+        drive_oauth_token_file=BASE_DIR
+        / (_getenv("DRIVE_OAUTH_TOKEN_FILE", "credentials/google-drive-token.json") or "credentials/google-drive-token.json"),
+        drive_folder_id=_getenv("DRIVE_FOLDER_ID"),
+        drive_folder_name=_getenv("DRIVE_FOLDER_NAME", "NecesidadesContratacion") or "NecesidadesContratacion",
         schedule_hours=_getenv_hours("SCHEDULE_HOURS", (8, 14, 20)),
         targets_file=BASE_DIR / "urls" / "targets.txt",
         log_file=BASE_DIR / "logs" / "scraper.log",

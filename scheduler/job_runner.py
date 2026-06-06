@@ -12,6 +12,8 @@ from database.repository import registrar_ejecucion, save_proceso
 from notifier.email_notifier import send_email
 from notifier.telegram_notifier import send_telegram
 from parser.nco_parser import parse_nco_detail
+from scraper.document_downloader import download_document
+from scraper.drive_uploader import upload_to_drive
 from scraper.firecrawl_client import FirecrawlScraper
 
 
@@ -62,6 +64,7 @@ def _process_url(url: str, scraper: FirecrawlScraper) -> None:
             raw_content = scraper.scrape(url)
             _save_raw_response(url, raw_content)
             parsed = parse_nco_detail(raw_content)
+            _process_documentos_anexos(url, parsed)
             result = save_proceso(session, parsed)
 
             estado_log = "sin_cambios" if result.estado == "sin_cambios" else "exitoso"
@@ -94,7 +97,58 @@ def _notify(subject: str, body: str) -> None:
     try:
         send_telegram(f"{subject}\n\n{body}")
     except Exception:
-        logger.exception("Telegram notification failed")
+            logger.exception("Telegram notification failed")
+
+
+def _process_documentos_anexos(url: str, parsed: dict[str, object]) -> None:
+    settings = get_settings()
+    documentos = parsed.get("documentos_anexos")
+    codigo = parsed.get("codigo_necesidad")
+    if not settings.download_documents or not documentos or not isinstance(codigo, str):
+        return
+
+    for documento in documentos:
+        if not isinstance(documento, dict):
+            continue
+
+        descripcion = documento.get("descripcion_archivo")
+        download_url = documento.get("download_url")
+        if not isinstance(descripcion, str) or not isinstance(download_url, str):
+            continue
+
+        try:
+            download_result = download_document(
+                page_url=url,
+                download_url=download_url,
+                descripcion=descripcion,
+                codigo_necesidad=codigo,
+                output_dir=settings.documents_dir,
+            )
+            documento.update(download_result)
+
+            if settings.drive_upload_enabled:
+                credentials_file = (
+                    settings.drive_oauth_client_file
+                    if settings.drive_auth_mode == "oauth"
+                    else settings.drive_service_account_file
+                )
+                if credentials_file is None:
+                    raise ValueError("Google Drive credentials file is required when DRIVE_UPLOAD_ENABLED=true")
+
+                drive_result = upload_to_drive(
+                    local_path=settings.documents_dir / download_result["nombre_archivo"],
+                    credentials_file=credentials_file,
+                    folder_name=settings.drive_folder_name,
+                    folder_id=settings.drive_folder_id,
+                    auth_mode=settings.drive_auth_mode,
+                    token_file=settings.drive_oauth_token_file,
+                )
+                documento.update(drive_result)
+        except Exception as exc:
+            logger.warning("Attached document was downloaded but not uploaded: {} ({})", descripcion, exc)
+            documento["ruta_local"] = documento.get("ruta_local")
+            documento["drive_url"] = documento.get("drive_url")
+            documento["error"] = str(exc)
 
 
 def _save_raw_response(url: str, raw_content: str) -> None:

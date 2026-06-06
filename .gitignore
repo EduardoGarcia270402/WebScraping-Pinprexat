@@ -1,4 +1,6 @@
 .env
+credentials/
+downloads/
 __pycache__/
 *.py[cod]
 *.pyo
