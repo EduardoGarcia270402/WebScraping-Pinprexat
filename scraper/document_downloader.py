@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
@@ -19,6 +20,9 @@ def download_document(
     request = Request(absolute_url, headers={"User-Agent": "Mozilla/5.0"})
     with urlopen(request, timeout=30) as response:
         content = response.read()
+        if _is_especificaciones_tecnicas(descripcion) and not _is_pdf_content(content):
+            raise ValueError(f"Attached document is not a PDF: {descripcion}")
+
         filename = _build_filename(
             descripcion=descripcion,
             codigo_necesidad=codigo_necesidad,
@@ -41,6 +45,9 @@ def _build_filename(
     download_url: str,
     content_disposition: str | None,
 ) -> str:
+    if _is_especificaciones_tecnicas(descripcion):
+        return f"EspecificacionesTecnicas_{_safe_contract_code(codigo_necesidad)}.pdf"
+
     extension = _extract_extension(content_disposition, download_url)
     base_name = f"{_slug(descripcion)}_{_slug(codigo_necesidad)}"
     return f"{base_name}{extension}"
@@ -62,3 +69,24 @@ def _slug(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9]+", "_", value.strip())
     cleaned = re.sub(r"_+", "_", cleaned).strip("_")
     return cleaned or "archivo"
+
+
+def _safe_contract_code(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_")
+    return cleaned or "codigo"
+
+
+def _is_especificaciones_tecnicas(value: str) -> bool:
+    without_accents = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(char)
+    )
+    normalized = re.sub(r"[^A-Za-z0-9]+", " ", without_accents).lower()
+    normalized = " ".join(normalized.split())
+    return "especificaciones" in normalized
+
+
+def _is_pdf_content(content: bytes) -> bool:
+    return content.lstrip().startswith(b"%PDF")

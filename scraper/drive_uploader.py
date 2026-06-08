@@ -36,12 +36,20 @@ def upload_to_drive(
         ) from exc
 
     media = MediaFileUpload(str(local_path), resumable=False)
-    metadata = {"name": local_path.name, "parents": [target_folder_id]}
-    file = (
-        service.files()
-        .create(body=metadata, media_body=media, fields="id, webViewLink")
-        .execute()
-    )
+    existing_file_id = _find_file_by_name(service, local_path.name, target_folder_id)
+    if existing_file_id:
+        file = (
+            service.files()
+            .update(fileId=existing_file_id, media_body=media, fields="id, webViewLink")
+            .execute()
+        )
+    else:
+        metadata = {"name": local_path.name, "parents": [target_folder_id]}
+        file = (
+            service.files()
+            .create(body=metadata, media_body=media, fields="id, webViewLink")
+            .execute()
+        )
     return {
         "drive_file_id": file["id"],
         "drive_url": file.get("webViewLink") or f"https://drive.google.com/file/d/{file['id']}/view",
@@ -132,3 +140,11 @@ def _get_or_create_folder(service: Any, folder_name: str) -> str:
         .execute()
     )
     return folder["id"]
+
+
+def _find_file_by_name(service: Any, filename: str, folder_id: str) -> str | None:
+    escaped_name = filename.replace("'", "\\'")
+    query = f"'{folder_id}' in parents and name='{escaped_name}' and trashed=false"
+    result = service.files().list(q=query, spaces="drive", fields="files(id)", pageSize=1).execute()
+    files = result.get("files", [])
+    return files[0]["id"] if files else None

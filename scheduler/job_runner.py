@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Callable
 from hashlib import sha1
 
@@ -104,13 +105,18 @@ def _process_documentos_anexos(url: str, parsed: dict[str, object]) -> None:
     settings = get_settings()
     documentos = parsed.get("documentos_anexos")
     codigo = parsed.get("codigo_necesidad")
-    if not settings.download_documents or not documentos or not isinstance(codigo, str):
+    if not isinstance(documentos, list):
+        parsed["documentos_anexos"] = []
         return
 
-    for documento in documentos:
-        if not isinstance(documento, dict):
-            continue
+    documento_filtrado = _select_especificaciones_document(documentos)
+    parsed["documentos_anexos"] = []
 
+    if not settings.download_documents or documento_filtrado is None or not isinstance(codigo, str):
+        return
+
+    documentos_procesados: list[dict[str, object]] = []
+    for documento in [documento_filtrado]:
         descripcion = documento.get("descripcion_archivo")
         download_url = documento.get("download_url")
         if not isinstance(descripcion, str) or not isinstance(download_url, str):
@@ -144,11 +150,51 @@ def _process_documentos_anexos(url: str, parsed: dict[str, object]) -> None:
                     token_file=settings.drive_oauth_token_file,
                 )
                 documento.update(drive_result)
+            documentos_procesados.append(documento)
         except Exception as exc:
             logger.warning("Attached document was downloaded but not uploaded: {} ({})", descripcion, exc)
-            documento["ruta_local"] = documento.get("ruta_local")
-            documento["drive_url"] = documento.get("drive_url")
-            documento["error"] = str(exc)
+
+    parsed["documentos_anexos"] = documentos_procesados
+
+
+def _select_especificaciones_document(documentos: list[object]) -> dict[str, object] | None:
+    candidates = [documento for documento in documentos if isinstance(documento, dict)]
+    exact_matches = [
+        documento
+        for documento in candidates
+        if _is_exact_especificaciones_tecnicas(documento.get("descripcion_archivo"))
+    ]
+    if exact_matches:
+        return exact_matches[0]
+
+    fallback_matches = [
+        documento
+        for documento in candidates
+        if _is_especificaciones_tecnicas(documento.get("descripcion_archivo"))
+    ]
+    return fallback_matches[0] if fallback_matches else None
+
+
+def _is_exact_especificaciones_tecnicas(value: object) -> bool:
+    return _normalize_document_description(value) == "especificaciones tecnicas"
+
+
+def _is_especificaciones_tecnicas(value: object) -> bool:
+    normalized = _normalize_document_description(value)
+    return "especificaciones" in normalized
+
+
+def _normalize_document_description(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+
+    normalized = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(char)
+    )
+    normalized = " ".join(normalized.lower().split())
+    return normalized
 
 
 def _save_raw_response(url: str, raw_content: str) -> None:
