@@ -3,16 +3,27 @@ from __future__ import annotations
 import unicodedata
 from collections.abc import Callable
 from hashlib import sha1
+from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from loguru import logger
 
 from config.settings import get_settings
 from database.connection import SessionLocal
-from database.repository import registrar_ejecucion, save_proceso
+from database.repository import (
+    get_cotizacion_by_numero,
+    get_latest_cotizacion,
+    registrar_ejecucion,
+    save_cotizacion,
+    save_especificaciones_pdf,
+    save_proceso,
+)
 from notifier.email_notifier import send_email
 from notifier.telegram_notifier import send_telegram
 from parser.nco_parser import parse_nco_detail
+from parser.pdf_specs_parser import extract_pdf_specs
+from quotation.pdf_renderer import render_quotation_pdf
+from quotation.quotation_builder import build_quotation_data, generate_quotation_number
 from scraper.document_downloader import download_document
 from scraper.drive_uploader import upload_to_drive
 from scraper.firecrawl_client import FirecrawlScraper
@@ -67,6 +78,8 @@ def _process_url(url: str, scraper: FirecrawlScraper) -> None:
             parsed = parse_nco_detail(raw_content)
             _process_documentos_anexos(url, parsed)
             result = save_proceso(session, parsed)
+            session.flush()
+            _process_cotizacion(session, result.proceso)
 
             estado_log = "sin_cambios" if result.estado == "sin_cambios" else "exitoso"
             mensaje = _build_result_message(result.estado, parsed.get("codigo_necesidad"), result.cambios)
@@ -155,6 +168,82 @@ def _process_documentos_anexos(url: str, parsed: dict[str, object]) -> None:
             logger.warning("Attached document was downloaded but not uploaded: {} ({})", descripcion, exc)
 
     parsed["documentos_anexos"] = documentos_procesados
+
+
+def _process_cotizacion(session, proceso) -> None:
+    settings = get_settings()
+    if not settings.quotation_enabled:
+        return
+
+    if get_latest_cotizacion(session, proceso) is not None:
+        return
+
+    specs = None
+    documento = _select_local_pdf_document(proceso.documentos_anexos)
+    if documento is not None and documento.ruta_local:
+        try:
+            specs_data = extract_pdf_specs(Path(documento.ruta_local))
+            specs_data["documento_anexo_id"] = documento.id
+            specs = save_especificaciones_pdf(session, proceso, specs_data)
+        except Exception as exc:
+            logger.warning("Specification PDF extraction failed for {}: {}", proceso.codigo_necesidad, exc)
+
+    try:
+        numero_cotizacion = _build_unique_quotation_number(session)
+        quotation_data = build_quotation_data(
+            proceso=proceso,
+            specs=specs or proceso.especificaciones_pdf,
+            settings=settings,
+            numero_cotizacion=numero_cotizacion,
+        )
+        pdf_path = render_quotation_pdf(quotation_data, settings.quotations_dir)
+        cotizacion_data = {
+            "numero_cotizacion": quotation_data.numero_cotizacion,
+            "fecha": quotation_data.fecha,
+            "ruta_pdf": str(pdf_path),
+            "estado": "generada",
+        }
+
+        if settings.drive_upload_enabled:
+            credentials_file = (
+                settings.drive_oauth_client_file
+                if settings.drive_auth_mode == "oauth"
+                else settings.drive_service_account_file
+            )
+            if credentials_file is None:
+                raise ValueError("Google Drive credentials file is required when DRIVE_UPLOAD_ENABLED=true")
+
+            drive_result = upload_to_drive(
+                local_path=pdf_path,
+                credentials_file=credentials_file,
+                folder_name=settings.quotation_drive_folder_name,
+                folder_id=settings.quotation_drive_folder_id,
+                auth_mode=settings.drive_auth_mode,
+                token_file=settings.drive_oauth_token_file,
+            )
+            cotizacion_data.update(drive_result)
+
+        save_cotizacion(session, proceso, cotizacion_data)
+        logger.info("Quotation generated for {}: {}", proceso.codigo_necesidad, pdf_path)
+    except Exception as exc:
+        logger.warning("Quotation generation failed for {}: {}", proceso.codigo_necesidad, exc)
+
+
+def _select_local_pdf_document(documentos: list[object]):
+    for documento in documentos:
+        ruta_local = getattr(documento, "ruta_local", None)
+        nombre_archivo = getattr(documento, "nombre_archivo", "") or ""
+        if ruta_local and nombre_archivo.lower().endswith(".pdf"):
+            return documento
+    return None
+
+
+def _build_unique_quotation_number(session) -> str:
+    for _ in range(20):
+        numero = generate_quotation_number()
+        if get_cotizacion_by_numero(session, numero) is None:
+            return numero
+    raise RuntimeError("Could not generate a unique quotation number")
 
 
 def _select_especificaciones_document(documentos: list[object]) -> dict[str, object] | None:

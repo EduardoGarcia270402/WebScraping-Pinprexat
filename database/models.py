@@ -51,6 +51,15 @@ class Proceso(Base):
         back_populates="proceso",
         cascade="all, delete-orphan",
     )
+    especificaciones_pdf: Mapped[EspecificacionPDF | None] = relationship(
+        back_populates="proceso",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    cotizaciones: Mapped[list[Cotizacion]] = relationship(
+        back_populates="proceso",
+        cascade="all, delete-orphan",
+    )
 
 
 class Funcionario(Base):
@@ -117,6 +126,45 @@ class DocumentoAnexo(Base):
     drive_url: Mapped[str | None] = mapped_column(Text)
 
     proceso: Mapped[Proceso] = relationship(back_populates="documentos_anexos")
+
+
+class EspecificacionPDF(Base):
+    __tablename__ = "especificaciones_pdf"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False, unique=True)
+    documento_anexo_id: Mapped[int | None] = mapped_column(ForeignKey("documentos_anexos.id"))
+    plazo_ejecucion: Mapped[str | None] = mapped_column(Text)
+    garantia: Mapped[str | None] = mapped_column(Text)
+    validez_proforma: Mapped[str | None] = mapped_column(Text)
+    terminos_condiciones: Mapped[str | None] = mapped_column(Text)
+    texto_extraido: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    proceso: Mapped[Proceso] = relationship(back_populates="especificaciones_pdf")
+    documento_anexo: Mapped[DocumentoAnexo | None] = relationship()
+
+
+class Cotizacion(Base):
+    __tablename__ = "cotizaciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False)
+    numero_cotizacion: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    ruta_pdf: Mapped[str | None] = mapped_column(Text)
+    drive_file_id: Mapped[str | None] = mapped_column(String)
+    drive_url: Mapped[str | None] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(String, nullable=False, default="generada")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    proceso: Mapped[Proceso] = relationship(back_populates="cotizaciones")
 
 
 class EjecucionLog(Base):

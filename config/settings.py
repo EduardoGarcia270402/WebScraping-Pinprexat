@@ -87,6 +87,15 @@ class Settings:
     drive_oauth_token_file: Path
     drive_folder_id: str | None
     drive_folder_name: str
+    quotation_enabled: bool
+    quotations_dir: Path
+    quotation_drive_folder_id: str | None
+    quotation_drive_folder_name: str
+    company_name: str
+    company_ruc: str | None
+    company_address: str | None
+    company_phone: str | None
+    company_email: str | None
     schedule_hours: tuple[int, ...]
     targets_file: Path
     log_file: Path
@@ -138,6 +147,15 @@ def get_settings() -> Settings:
         / (_getenv("DRIVE_OAUTH_TOKEN_FILE", "credentials/google-drive-token.json") or "credentials/google-drive-token.json"),
         drive_folder_id=_getenv("DRIVE_FOLDER_ID"),
         drive_folder_name=_getenv("DRIVE_FOLDER_NAME", "NecesidadesContratacion") or "NecesidadesContratacion",
+        quotation_enabled=_getenv_bool("QUOTATION_ENABLED", True),
+        quotations_dir=BASE_DIR / (_getenv("QUOTATIONS_DIR", "downloads/cotizaciones") or "downloads/cotizaciones"),
+        quotation_drive_folder_id=_getenv("QUOTATION_DRIVE_FOLDER_ID"),
+        quotation_drive_folder_name=_getenv("QUOTATION_DRIVE_FOLDER_NAME", "Cotizaciones") or "Cotizaciones",
+        company_name=_getenv("COMPANY_NAME", "PINPREXAT") or "PINPREXAT",
+        company_ruc=_getenv("COMPANY_RUC"),
+        company_address=_getenv("COMPANY_ADDRESS"),
+        company_phone=_getenv("COMPANY_PHONE"),
+        company_email=_getenv("COMPANY_EMAIL"),
         schedule_hours=_getenv_hours("SCHEDULE_HOURS", (8, 14, 20)),
         targets_file=BASE_DIR / "urls" / "targets.txt",
         log_file=BASE_DIR / "logs" / "scraper.log",

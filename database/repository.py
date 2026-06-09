@@ -8,7 +8,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from database.models import DocumentoAnexo, EjecucionLog, Funcionario, ItemCompra, LugarEntrega, Proceso, Proveedor
+from database.models import (
+    Cotizacion,
+    DocumentoAnexo,
+    EjecucionLog,
+    EspecificacionPDF,
+    Funcionario,
+    ItemCompra,
+    LugarEntrega,
+    Proceso,
+    Proveedor,
+)
 
 
 PROCESO_FIELDS = (
@@ -31,6 +41,22 @@ DOCUMENTO_FIELDS = (
     "drive_file_id",
     "drive_url",
 )
+ESPECIFICACION_FIELDS = (
+    "documento_anexo_id",
+    "plazo_ejecucion",
+    "garantia",
+    "validez_proforma",
+    "terminos_condiciones",
+    "texto_extraido",
+)
+COTIZACION_FIELDS = (
+    "numero_cotizacion",
+    "fecha",
+    "ruta_pdf",
+    "drive_file_id",
+    "drive_url",
+    "estado",
+)
 
 
 @dataclass(frozen=True)
@@ -49,8 +75,24 @@ def get_proceso_by_codigo(session: Session, codigo_necesidad: str) -> Proceso | 
             selectinload(Proceso.items_compra),
             selectinload(Proceso.proveedores),
             selectinload(Proceso.documentos_anexos),
+            selectinload(Proceso.especificaciones_pdf),
+            selectinload(Proceso.cotizaciones),
         )
         .where(Proceso.codigo_necesidad == codigo_necesidad)
+    )
+    return session.scalars(statement).first()
+
+
+def get_cotizacion_by_numero(session: Session, numero_cotizacion: str) -> Cotizacion | None:
+    statement = select(Cotizacion).where(Cotizacion.numero_cotizacion == numero_cotizacion)
+    return session.scalars(statement).first()
+
+
+def get_latest_cotizacion(session: Session, proceso: Proceso) -> Cotizacion | None:
+    statement = (
+        select(Cotizacion)
+        .where(Cotizacion.proceso_id == proceso.id)
+        .order_by(Cotizacion.creado_en.desc(), Cotizacion.id.desc())
     )
     return session.scalars(statement).first()
 
@@ -78,6 +120,34 @@ def registrar_ejecucion(session: Session, url: str, estado: str, mensaje: str | 
     log = EjecucionLog(url=url, estado=estado, mensaje=mensaje)
     session.add(log)
     return log
+
+
+def save_especificaciones_pdf(
+    session: Session,
+    proceso: Proceso,
+    data: dict[str, Any],
+) -> EspecificacionPDF:
+    values = _pick(data, ESPECIFICACION_FIELDS)
+    if proceso.especificaciones_pdf is None:
+        especificaciones = EspecificacionPDF(**values)
+        proceso.especificaciones_pdf = especificaciones
+        session.add(especificaciones)
+        return especificaciones
+
+    for field, value in values.items():
+        setattr(proceso.especificaciones_pdf, field, value)
+    return proceso.especificaciones_pdf
+
+
+def save_cotizacion(
+    session: Session,
+    proceso: Proceso,
+    data: dict[str, Any],
+) -> Cotizacion:
+    cotizacion = Cotizacion(**_pick(data, COTIZACION_FIELDS))
+    proceso.cotizaciones.append(cotizacion)
+    session.add(cotizacion)
+    return cotizacion
 
 
 def _build_proceso(data: dict[str, Any]) -> Proceso:
