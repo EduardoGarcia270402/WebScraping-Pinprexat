@@ -21,6 +21,8 @@ def test_build_quotation_data_combines_process_and_pdf_specs() -> None:
     proceso = Proceso(
         codigo_necesidad="NIC-001",
         nombre_entidad="Ministerio de Prueba",
+        fecha_publicacion=date(2026, 6, 8),
+        fecha_limite=date(2026, 6, 10),
     )
     proceso.funcionario = Funcionario(nombre="Ana Perez", correo="ana@example.com")
     proceso.lugar_entrega = LugarEntrega(provincia="Pichincha", canton="Quito", direccion="Av. Siempre Viva")
@@ -59,6 +61,8 @@ def test_build_quotation_data_combines_process_and_pdf_specs() -> None:
     assert data.client.nombre == "Ministerio de Prueba"
     assert data.items[0].descripcion == "Cepillo de limpieza"
     assert data.plazo_ejecucion == "30 dias"
+    assert data.fecha_publicacion == date(2026, 6, 8)
+    assert data.fecha_limite_entrega == date(2026, 6, 10)
 
 
 def test_render_quotation_pdf_creates_file(tmp_path) -> None:

@@ -42,6 +42,20 @@ def test_parse_nco_detail_from_markdown_table() -> None:
     ]
 
 
+def test_parse_nco_detail_from_real_publication_and_deadline_html() -> None:
+    raw = """
+<strong>Fecha de Publicación de la Necesidad:</strong>
+<p class="card-text">2026-06-08 15:00:00</p>
+<strong>Fecha Límite para la entrega de Proformas:</strong>
+<p class="card-text">2026-06-10 15:00:00</p>
+"""
+
+    result = parse_nco_detail(raw)
+
+    assert result["fecha_publicacion"].isoformat() == "2026-06-08"
+    assert result["fecha_limite"].isoformat() == "2026-06-10"
+
+
 def test_parse_nco_detail_from_sercop_html_item_table() -> None:
     raw = """
 <h2 class="importante">Detalle del objeto de compra</h2>
@@ -122,6 +136,47 @@ def test_parse_nco_detail_from_documentos_anexos() -> None:
         {
             "descripcion_archivo": "ESPECIFICACIONES TECNICAS",
             "download_url": "../GE/ExeGENBajarArchivoGeneral.cpe?Archivo=ghi,&idPath=jkl,",
+        },
+    ]
+
+
+def test_parse_documentos_from_terminos_referencia_section() -> None:
+    raw = """
+<div>ARCHIVO QUE CONTIENE LAS ESPECIFICACIONES TÉCNICAS / TÉRMINOS DE REFERENCIA</div>
+<table>
+    <tr>
+        <th>Descripción del Archivo</th>
+        <th>Descargar Archivo</th>
+    </tr>
+    <tr>
+        <td>PROYECTOORDENDECOMPRA</td>
+        <td><a href="../GE/descarga.cpe?archivo=orden"><img src="download.png"></a></td>
+    </tr>
+    <tr>
+        <td>INFORMEDENECESIDAD</td>
+        <td><a href="../GE/descarga.cpe?archivo=informe"><img src="download.png"></a></td>
+    </tr>
+    <tr>
+        <td>TERMINOSDEREFERENCIA</td>
+        <td><a href="../GE/descarga.cpe?archivo=tdr"><img src="download.png"></a></td>
+    </tr>
+</table>
+"""
+
+    result = parse_nco_detail(raw)
+
+    assert result["documentos_anexos"] == [
+        {
+            "descripcion_archivo": "PROYECTOORDENDECOMPRA",
+            "download_url": "../GE/descarga.cpe?archivo=orden",
+        },
+        {
+            "descripcion_archivo": "INFORMEDENECESIDAD",
+            "download_url": "../GE/descarga.cpe?archivo=informe",
+        },
+        {
+            "descripcion_archivo": "TERMINOSDEREFERENCIA",
+            "download_url": "../GE/descarga.cpe?archivo=tdr",
         },
     ]
 

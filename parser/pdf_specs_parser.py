@@ -72,20 +72,38 @@ def extract_specs_from_text(text: str) -> dict[str, str | None]:
 
 
 def _find_condition_summary(text: str, labels: tuple[str, ...]) -> str | None:
+    section = _find_numbered_section(text, labels) or _find_labeled_section(text, labels)
+    if section:
+        duration = _extract_duration(section)
+        if duration:
+            return duration
+
+    value = _find_labeled_value(text, labels)
+    if value:
+        duration = _extract_duration(value)
+        if duration:
+            return duration
+
     keyword_summary = _find_keyword_condition_summary(text, labels)
     if keyword_summary:
         return keyword_summary
 
-    section = _find_labeled_section(text, labels)
-    if section:
-        summary = _summarize_condition(section)
-        if summary:
-            return summary
+    return None
 
-    value = _find_labeled_value(text, labels)
-    if value:
-        return _summarize_condition(value) or value
 
+def _find_numbered_section(text: str, labels: tuple[str, ...]) -> str | None:
+    for label in labels:
+        label_pattern = r"\s+".join(re.escape(part) for part in label.split())
+        pattern = re.compile(
+            rf"(?:^|\n)\s*\d+\s*[\.\)]\s*{label_pattern}\s*:?\s*"
+            rf"(?P<value>.*?)(?=\n\s*\d+\s*[\.\)]|\Z)",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.search(text)
+        if match:
+            value = _clean_value(match.group("value"))
+            if value:
+                return value
     return None
 
 
@@ -115,7 +133,7 @@ def _find_labeled_value(text: str, labels: tuple[str, ...]) -> str | None:
         if match:
             value = _clean_value(match.group("value"))
             if value and not _looks_like_heading(value):
-                return _find_duration_sentence(value) or value
+                return value
 
         inline_pattern = re.compile(
             rf"{label_pattern}\s+(?:es|sera|de|minima|minimo)?\s*(?P<value>\d+[^\n]{{0,120}})",
@@ -192,13 +210,9 @@ def _find_keyword_condition_summary(text: str, labels: tuple[str, ...]) -> str |
             flags=re.IGNORECASE | re.DOTALL,
         )
         for match in pattern.finditer(text):
-            summary = _summarize_condition(
-                match.group("context"),
-                max_words=9 if keyword == "garantia" else 10,
-                require_duration=True,
-            )
-            if summary:
-                return summary
+            duration = _extract_duration(match.group("context"))
+            if duration:
+                return duration
     return None
 
 
@@ -214,7 +228,7 @@ def _condition_keywords(labels: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _summarize_condition(value: str, max_words: int = 10, require_duration: bool = False) -> str | None:
-    duration = _find_duration_sentence(value)
+    duration = _extract_duration(value)
     if require_duration and duration is None:
         return None
 
@@ -248,6 +262,50 @@ def _find_duration_sentence(value: str) -> str | None:
         if match:
             return _clean_value(match.group(0))
     return None
+
+
+def _extract_duration(value: str) -> str | None:
+    pattern = re.compile(
+        r"(?:minim[ao]\s+(?:de\s+)?)?"
+        r"(?P<number>\d+|un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|"
+        r"quince|treinta|cuarenta|sesenta|noventa)"
+        r"(?:\s*\((?P<parenthetical>\d+)\))?\s*"
+        r"(?P<unit>dia|dias|mes|meses|ano|anos)\b",
+        flags=re.IGNORECASE,
+    )
+    match = pattern.search(value)
+    if not match:
+        return None
+
+    parenthetical = match.group("parenthetical")
+    raw_number = match.group("number").lower()
+    word_numbers = {
+        "un": "1",
+        "uno": "1",
+        "dos": "2",
+        "tres": "3",
+        "cuatro": "4",
+        "cinco": "5",
+        "seis": "6",
+        "siete": "7",
+        "ocho": "8",
+        "nueve": "9",
+        "diez": "10",
+        "quince": "15",
+        "treinta": "30",
+        "cuarenta": "40",
+        "sesenta": "60",
+        "noventa": "90",
+    }
+    number = parenthetical or word_numbers.get(raw_number, raw_number)
+    unit = match.group("unit").lower()
+    if unit in {"dia", "dias"}:
+        normalized_unit = "dia" if number == "1" else "dias"
+    elif unit in {"mes", "meses"}:
+        normalized_unit = "mes" if number == "1" else "meses"
+    else:
+        normalized_unit = "año" if number == "1" else "años"
+    return f"{number} {normalized_unit}"
 
 
 def _strip_accents(value: str) -> str:

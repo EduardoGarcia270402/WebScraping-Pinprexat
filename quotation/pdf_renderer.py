@@ -20,8 +20,26 @@ def render_quotation_pdf(data: QuotationData, output_dir: Path) -> Path:
     pdf_path = output_dir / f"Cotizacion_{_safe_filename(data.numero_cotizacion)}_{_safe_filename(data.codigo_necesidad)}.pdf"
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=8, leading=10))
-    styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontSize=11, leading=14, spaceBefore=10))
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12
+    styles["Title"].fontSize = 10
+    styles["Title"].leading = 12
+    styles["Title"].spaceAfter = 4
+    styles["Heading2"].fontSize = 10
+    styles["Heading2"].leading = 12
+    styles["Heading2"].spaceBefore = 4
+    styles["Heading2"].spaceAfter = 4
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=10, leading=12))
+    styles.add(
+        ParagraphStyle(
+            name="Section",
+            parent=styles["Heading2"],
+            fontSize=10,
+            leading=12,
+            spaceBefore=8,
+            spaceAfter=4,
+        )
+    )
 
     doc = SimpleDocTemplate(
         str(pdf_path),
@@ -59,6 +77,7 @@ def render_quotation_pdf(data: QuotationData, output_dir: Path) -> Path:
         ("Direccion", data.client.direccion),
         ("Provincia/Canton", _join_values(data.client.provincia, data.client.canton)),
         ("Codigo necesidad", data.codigo_necesidad),
+        ("Fecha de publicacion", _format_date(data.fecha_publicacion)),
     ]
     story.extend(_details_block("Datos del cliente", client_lines, styles))
 
@@ -69,6 +88,7 @@ def render_quotation_pdf(data: QuotationData, output_dir: Path) -> Path:
         ("Plazo de ejecucion", data.plazo_ejecucion),
         ("Garantia", data.garantia),
         ("Validez de la proforma", data.validez_proforma),
+        ("Fecha limite de entrega", _format_date(data.fecha_limite_entrega)),
     ]
     story.extend(_details_block("Terminos y condiciones", terms_lines, styles))
     if data.terminos_condiciones:
@@ -111,6 +131,8 @@ def _details_block(title: str, rows: list[tuple[str, str | None]], styles: objec
             [
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
                 ("BACKGROUND", (0, 0), (0, -1), colors.whitesmoke),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("LEADING", (0, 0), (-1, -1), 12),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -151,6 +173,8 @@ def _items_table(data: QuotationData, styles: object) -> object:
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("LEADING", (0, 0), (-1, -1), 12),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),
@@ -165,6 +189,12 @@ def _format_decimal(value: Decimal | None) -> str:
     if value is None:
         return ""
     return f"{value:,.2f}"
+
+
+def _format_date(value: object | None) -> str | None:
+    if value is None:
+        return None
+    return value.strftime("%d/%m/%Y")
 
 
 def _join_values(*values: str | None) -> str | None:

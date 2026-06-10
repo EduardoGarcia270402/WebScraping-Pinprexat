@@ -13,8 +13,12 @@ LABELS = {
     "tipo_necesidad": ("Tipo de Necesidad",),
     "codigo_necesidad": ("Codigo Necesidad de Contratacion", "Codigo Necesidad", "Codigo"),
     "estado_necesidad": ("Estado de la Necesidad", "Estado Necesidad", "Estado"),
-    "fecha_publicacion": ("Fecha de Publicacion",),
-    "fecha_limite": ("Fecha Limite", "Fecha limite"),
+    "fecha_publicacion": ("Fecha de Publicacion de la Necesidad", "Fecha de Publicacion"),
+    "fecha_limite": (
+        "Fecha Limite para la entrega de Proformas",
+        "Fecha Limite de entrega",
+        "Fecha Limite",
+    ),
 }
 
 FUNCIONARIO_LABELS = {
@@ -37,6 +41,14 @@ def parse_nco_detail(raw_content: str) -> dict[str, Any]:
     for field, labels in LABELS.items():
         data[field] = _find_value(text, labels)
 
+    data["fecha_publicacion"] = _find_html_following_value(
+        raw_content,
+        LABELS["fecha_publicacion"],
+    ) or data["fecha_publicacion"]
+    data["fecha_limite"] = _find_html_following_value(
+        raw_content,
+        LABELS["fecha_limite"],
+    ) or data["fecha_limite"]
     data["fecha_publicacion"] = _parse_date(data["fecha_publicacion"])
     data["fecha_limite"] = _parse_date(data["fecha_limite"])
     data["funcionario"] = {
@@ -51,6 +63,23 @@ def parse_nco_detail(raw_content: str) -> dict[str, Any]:
     data["documentos_anexos"] = _parse_documentos_anexos(raw_content)
     data["proveedores"] = _parse_proveedores(raw_content)
     return data
+
+
+def _find_html_following_value(raw_content: str, labels: tuple[str, ...]) -> str | None:
+    for label in labels:
+        label_pattern = r"\s+".join(re.escape(part) for part in _strip_accents(label).split())
+        normalized_html = _strip_accents(unescape(raw_content))
+        pattern = re.compile(
+            rf"<strong\b[^>]*>\s*{label_pattern}\s*:?\s*</strong>\s*"
+            rf"(?:<p\b[^>]*>)?\s*(?P<value>[^<\n]+)",
+            flags=re.IGNORECASE,
+        )
+        match = pattern.search(normalized_html)
+        if match:
+            value = _clean_value(match.group("value"))
+            if value:
+                return value
+    return None
 
 
 def _normalize_text(raw_content: str) -> str:
@@ -133,7 +162,7 @@ def _parse_html_items(raw_content: str) -> list[dict[str, Any]]:
 
 
 def _parse_documentos_anexos(raw_content: str) -> list[dict[str, Any]]:
-    table = _find_section_table(raw_content, "Documentos Anexos")
+    table = _find_documentos_table(raw_content)
     if not table:
         return []
 
@@ -156,6 +185,27 @@ def _parse_documentos_anexos(raw_content: str) -> list[dict[str, Any]]:
         )
 
     return documentos
+
+
+def _find_documentos_table(raw_content: str) -> str | None:
+    section_titles = (
+        "Documentos Anexos",
+        "Archivo que contiene las especificaciones tecnicas",
+        "Terminos de referencia",
+    )
+    for section_title in section_titles:
+        table = _find_section_table(raw_content, section_title)
+        if table:
+            return table
+
+    tables = re.findall(r"<table\b[^>]*>.*?</table>", raw_content, flags=re.IGNORECASE | re.DOTALL)
+    for table in tables:
+        normalized = _normalize_match_text(table)
+        has_description = "descripcion del archivo" in normalized
+        has_download = "descargar archivo" in normalized
+        if has_description and has_download:
+            return table
+    return None
 
 
 def _parse_proveedores(raw_content: str) -> list[dict[str, Any]]:

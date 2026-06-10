@@ -16,8 +16,8 @@ def test_extract_specs_from_text_finds_required_terms() -> None:
 
     result = extract_specs_from_text(text)
 
-    assert result["plazo_ejecucion"] == "30 dias calendario contados desde la notificacion"
-    assert result["garantia"] == "12 meses contra defectos de fabricacion"
+    assert result["plazo_ejecucion"] == "30 dias"
+    assert result["garantia"] == "12 meses"
     assert result["validez_proforma"] == "60 dias"
     assert result["terminos_condiciones"] == "La entrega se realizara en las bodegas de la entidad contratante"
 
@@ -33,8 +33,8 @@ def test_extract_specs_from_text_handles_plural_uppercase_guarantee_and_offer_va
 
     result = extract_specs_from_text(text)
 
-    assert result["garantia"] == "minima de 6 meses por defectos de fabrica"
-    assert result["validez_proforma"] == "minimo 30 dias calendario desde la presentacion de la proforma"
+    assert result["garantia"] == "6 meses"
+    assert result["validez_proforma"] == "30 dias"
 
 
 def test_extract_specs_from_numbered_sections_summarizes_exact_conditions() -> None:
@@ -54,8 +54,8 @@ def test_extract_specs_from_numbered_sections_summarizes_exact_conditions() -> N
 
     result = extract_specs_from_text(text)
 
-    assert result["garantia"] == "minima de seis (6) meses sobre el servicio brindado"
-    assert result["validez_proforma"] == "40 dias, contados a partir de la presentacion de esta"
+    assert result["garantia"] == "6 meses"
+    assert result["validez_proforma"] == "40 dias"
 
 
 def test_extract_specs_from_pdf_text_when_guarantee_paragraph_precedes_heading() -> None:
@@ -71,7 +71,7 @@ def test_extract_specs_from_pdf_text_when_guarantee_paragraph_precedes_heading()
 
     result = extract_specs_from_text(text)
 
-    assert result["garantia"] == "minima de seis (6) meses sobre el servicio brindado"
+    assert result["garantia"] == "6 meses"
 
 
 def test_extract_specs_from_text_ignores_early_guarantee_without_duration() -> None:
@@ -88,4 +88,4 @@ def test_extract_specs_from_text_ignores_early_guarantee_without_duration() -> N
 
     result = extract_specs_from_text(text)
 
-    assert result["garantia"] == "minima de seis (6) meses sobre el servicio brindado"
+    assert result["garantia"] == "6 meses"

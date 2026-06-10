@@ -43,6 +43,8 @@ class QuotationItem:
 class QuotationData:
     numero_cotizacion: str
     fecha: date
+    fecha_publicacion: date | None
+    fecha_limite_entrega: date | None
     codigo_necesidad: str
     company: CompanyInfo
     client: ClientInfo
@@ -73,6 +75,8 @@ def build_quotation_data(
     return QuotationData(
         numero_cotizacion=numero_cotizacion or generate_quotation_number(current_date),
         fecha=current_date,
+        fecha_publicacion=proceso.fecha_publicacion,
+        fecha_limite_entrega=proceso.fecha_limite,
         codigo_necesidad=proceso.codigo_necesidad,
         company=CompanyInfo(
             nombre=settings.company_name,

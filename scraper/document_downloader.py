@@ -85,7 +85,13 @@ def _is_especificaciones_tecnicas(value: str) -> bool:
     )
     normalized = re.sub(r"[^A-Za-z0-9]+", " ", without_accents).lower()
     normalized = " ".join(normalized.split())
-    return "especificaciones" in normalized
+    compact = normalized.replace(" ", "")
+    return (
+        "especificaciones" in normalized
+        or "terminos de referencia" in normalized
+        or "terminosdereferencia" in compact
+        or normalized == "tdr"
+    )
 
 
 def _is_pdf_content(content: bytes) -> bool:

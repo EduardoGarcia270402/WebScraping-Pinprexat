@@ -276,12 +276,20 @@ def _select_especificaciones_document(documentos: list[object]) -> dict[str, obj
 
 
 def _is_exact_especificaciones_tecnicas(value: object) -> bool:
-    return _normalize_document_description(value) == "especificaciones tecnicas"
+    normalized = _normalize_document_description(value)
+    compact = normalized.replace(" ", "")
+    return normalized in {"especificaciones tecnicas", "terminos de referencia"} or compact == "terminosdereferencia"
 
 
 def _is_especificaciones_tecnicas(value: object) -> bool:
     normalized = _normalize_document_description(value)
-    return "especificaciones" in normalized
+    compact = normalized.replace(" ", "")
+    return (
+        "especificaciones" in normalized
+        or "terminos de referencia" in normalized
+        or "terminosdereferencia" in compact
+        or normalized == "tdr"
+    )
 
 
 def _normalize_document_description(value: object) -> str:
