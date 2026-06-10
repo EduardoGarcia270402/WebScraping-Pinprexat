@@ -175,7 +175,8 @@ def _process_cotizacion(session, proceso) -> None:
     if not settings.quotation_enabled:
         return
 
-    if get_latest_cotizacion(session, proceso) is not None:
+    latest_cotizacion = get_latest_cotizacion(session, proceso)
+    if latest_cotizacion is not None and _should_skip_existing_cotizacion(latest_cotizacion, settings):
         return
 
     specs = None
@@ -236,6 +237,16 @@ def _select_local_pdf_document(documentos: list[object]):
         if ruta_local and nombre_archivo.lower().endswith(".pdf"):
             return documento
     return None
+
+
+def _should_skip_existing_cotizacion(cotizacion, settings) -> bool:
+    if settings.quotation_regenerate_existing:
+        return False
+
+    if not cotizacion.ruta_pdf:
+        return False
+
+    return Path(cotizacion.ruta_pdf).exists()
 
 
 def _build_unique_quotation_number(session) -> str:

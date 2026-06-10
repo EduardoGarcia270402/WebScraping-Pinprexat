@@ -289,8 +289,19 @@ def _replace_documentos_if_changed(
     if current_documentos == new_documentos:
         return None
 
+    _detach_especificaciones_from_removed_documentos(proceso)
     proceso.documentos_anexos = [_build_documento(documento) for documento in new_documentos]
     return current_documentos, new_documentos
+
+
+def _detach_especificaciones_from_removed_documentos(proceso: Proceso) -> None:
+    especificaciones = proceso.especificaciones_pdf
+    if especificaciones is None or especificaciones.documento_anexo_id is None:
+        return
+
+    current_documento_ids = {documento.id for documento in proceso.documentos_anexos if documento.id is not None}
+    if especificaciones.documento_anexo_id in current_documento_ids:
+        especificaciones.documento_anexo_id = None
 
 
 def _proveedor_to_dict(proveedor: Proveedor) -> dict[str, Any]:

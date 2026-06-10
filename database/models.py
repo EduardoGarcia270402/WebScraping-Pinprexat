@@ -133,7 +133,7 @@ class EspecificacionPDF(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     proceso_id: Mapped[int] = mapped_column(ForeignKey("procesos.id"), nullable=False, unique=True)
-    documento_anexo_id: Mapped[int | None] = mapped_column(ForeignKey("documentos_anexos.id"))
+    documento_anexo_id: Mapped[int | None] = mapped_column(ForeignKey("documentos_anexos.id", ondelete="SET NULL"))
     plazo_ejecucion: Mapped[str | None] = mapped_column(Text)
     garantia: Mapped[str | None] = mapped_column(Text)
     validez_proforma: Mapped[str | None] = mapped_column(Text)

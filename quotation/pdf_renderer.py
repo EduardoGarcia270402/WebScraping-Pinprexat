@@ -32,12 +32,17 @@ def render_quotation_pdf(data: QuotationData, output_dir: Path) -> Path:
         bottomMargin=1.2 * cm,
     )
 
-    story = [
+    story = []
+    logo = _logo_flowable(data)
+    if logo is not None:
+        story.extend([logo, Spacer(1, 8)])
+
+    story.extend([
         Paragraph(data.company.nombre, styles["Title"]),
         Paragraph(f"Cotizacion No. {data.numero_cotizacion}", styles["Heading2"]),
         Paragraph(f"Fecha: {data.fecha:%d/%m/%Y}", styles["Normal"]),
         Spacer(1, 10),
-    ]
+    ])
 
     company_lines = [
         ("RUC", data.company.ruc),
@@ -71,6 +76,25 @@ def render_quotation_pdf(data: QuotationData, output_dir: Path) -> Path:
 
     doc.build(story)
     return pdf_path
+
+
+def _logo_flowable(data: QuotationData) -> object | None:
+    logo_path = data.company.logo_path
+    if logo_path is None or not logo_path.exists():
+        return None
+
+    from reportlab.lib.units import cm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import Image
+
+    reader = ImageReader(str(logo_path))
+    width, height = reader.getSize()
+    max_width = 8.5 * cm
+    max_height = 2.3 * cm
+    scale = min(max_width / width, max_height / height)
+    image = Image(str(logo_path), width=width * scale, height=height * scale)
+    image.hAlign = "CENTER"
+    return image
 
 
 def _details_block(title: str, rows: list[tuple[str, str | None]], styles: object) -> list[object]:

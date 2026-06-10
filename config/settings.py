@@ -89,6 +89,7 @@ class Settings:
     drive_folder_name: str
     quotation_enabled: bool
     quotations_dir: Path
+    quotation_regenerate_existing: bool
     quotation_drive_folder_id: str | None
     quotation_drive_folder_name: str
     company_name: str
@@ -96,6 +97,7 @@ class Settings:
     company_address: str | None
     company_phone: str | None
     company_email: str | None
+    company_logo_path: Path | None
     schedule_hours: tuple[int, ...]
     targets_file: Path
     log_file: Path
@@ -149,6 +151,7 @@ def get_settings() -> Settings:
         drive_folder_name=_getenv("DRIVE_FOLDER_NAME", "NecesidadesContratacion") or "NecesidadesContratacion",
         quotation_enabled=_getenv_bool("QUOTATION_ENABLED", True),
         quotations_dir=BASE_DIR / (_getenv("QUOTATIONS_DIR", "downloads/cotizaciones") or "downloads/cotizaciones"),
+        quotation_regenerate_existing=_getenv_bool("QUOTATION_REGENERATE_EXISTING", False),
         quotation_drive_folder_id=_getenv("QUOTATION_DRIVE_FOLDER_ID"),
         quotation_drive_folder_name=_getenv("QUOTATION_DRIVE_FOLDER_NAME", "Cotizaciones") or "Cotizaciones",
         company_name=_getenv("COMPANY_NAME", "PINPREXAT") or "PINPREXAT",
@@ -156,6 +159,11 @@ def get_settings() -> Settings:
         company_address=_getenv("COMPANY_ADDRESS"),
         company_phone=_getenv("COMPANY_PHONE"),
         company_email=_getenv("COMPANY_EMAIL"),
+        company_logo_path=(
+            BASE_DIR / company_logo_path
+            if (company_logo_path := _getenv("COMPANY_LOGO_PATH"))
+            else None
+        ),
         schedule_hours=_getenv_hours("SCHEDULE_HOURS", (8, 14, 20)),
         targets_file=BASE_DIR / "urls" / "targets.txt",
         log_file=BASE_DIR / "logs" / "scraper.log",

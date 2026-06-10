@@ -18,6 +18,29 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_document_specs_constraint()
+
+
+def _ensure_document_specs_constraint() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "ALTER TABLE especificaciones_pdf "
+                "DROP CONSTRAINT IF EXISTS especificaciones_pdf_documento_anexo_id_fkey"
+            )
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE especificaciones_pdf "
+                "ADD CONSTRAINT especificaciones_pdf_documento_anexo_id_fkey "
+                "FOREIGN KEY (documento_anexo_id) "
+                "REFERENCES documentos_anexos(id) "
+                "ON DELETE SET NULL"
+            )
+        )
 
 
 def check_db_connection() -> None:

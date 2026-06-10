@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from random import SystemRandom
 
 from config.settings import Settings
@@ -16,6 +17,7 @@ class CompanyInfo:
     direccion: str | None
     telefono: str | None
     email: str | None
+    logo_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,7 @@ def build_quotation_data(
             direccion=settings.company_address,
             telefono=settings.company_phone,
             email=settings.company_email,
+            logo_path=getattr(settings, "company_logo_path", None),
         ),
         client=ClientInfo(
             nombre=proceso.nombre_entidad,
