@@ -109,6 +109,15 @@ def get_cotizacion_by_id(session: Session, cotizacion_id: int) -> Cotizacion | N
     return session.get(Cotizacion, cotizacion_id)
 
 
+def get_documento_by_id(session: Session, documento_id: int) -> DocumentoAnexo | None:
+    statement = (
+        select(DocumentoAnexo)
+        .options(selectinload(DocumentoAnexo.proceso))
+        .where(DocumentoAnexo.id == documento_id)
+    )
+    return session.scalars(statement).first()
+
+
 def get_latest_cotizacion(session: Session, proceso: Proceso) -> Cotizacion | None:
     statement = (
         select(Cotizacion)
@@ -318,8 +327,29 @@ def _replace_documentos_if_changed(
         _documento_to_dict(documento)
         for documento in sorted(proceso.documentos_anexos, key=lambda documento: documento.descripcion_archivo or "")
     ]
+    preserved_metadata = {
+        (documento.download_url, documento.descripcion_archivo): {
+            "nombre_archivo": documento.nombre_archivo,
+            "ruta_local": documento.ruta_local,
+            "drive_file_id": documento.drive_file_id,
+            "drive_url": documento.drive_url,
+        }
+        for documento in proceso.documentos_anexos
+    }
     new_documentos = [
-        _normalize_documento(documento)
+        _normalize_documento(
+            {
+                **documento,
+                **{
+                    field: value
+                    for field, value in preserved_metadata.get(
+                        (documento.get("download_url"), documento.get("descripcion_archivo")),
+                        {},
+                    ).items()
+                    if not documento.get(field)
+                },
+            }
+        )
         for documento in sorted(new_documentos_data, key=lambda documento: documento.get("descripcion_archivo") or "")
     ]
 

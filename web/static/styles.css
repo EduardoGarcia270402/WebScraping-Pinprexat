@@ -106,6 +106,61 @@ td:first-child { text-align: center; font-weight: 800; }
 .money { min-width: 120px; text-align: right; }
 .actions { margin-top: 28px; }
 .centered { justify-content: center; }
+.document-count {
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: var(--blue-light);
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 800;
+}
+.document-list { display: grid; gap: 12px; margin-top: 22px; }
+.document-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fbfcfd;
+}
+.document-icon {
+    display: grid;
+    width: 46px;
+    height: 52px;
+    place-items: center;
+    border-radius: 8px;
+    background: #e5eef6;
+    color: var(--navy);
+    font-size: 12px;
+    font-weight: 900;
+}
+.document-info { display: grid; gap: 5px; min-width: 0; }
+.document-info strong, .document-info > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.document-info > span { color: var(--muted); font-size: 13px; }
+.document-statuses, .document-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.document-status {
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+}
+.document-status.ready { background: #dff2e7; color: #19683a; }
+.document-status.pending { background: #fff3cf; color: #765700; }
+.document-status.drive { background: var(--blue-light); color: var(--blue); }
+.compact { padding: 9px 13px; font-size: 13px; }
+.empty-state {
+    padding: 22px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    text-align: center;
+}
 .success-card { max-width: 760px; margin: 10vh auto; text-align: center; }
 .success-mark {
     display: grid;
@@ -123,6 +178,8 @@ td:first-child { text-align: center; font-weight: 800; }
     .container { margin-top: 28px; }
     .url-row, .form-grid { grid-template-columns: 1fr; }
     .page-heading, .section-heading { align-items: flex-start; flex-direction: column; }
+    .document-item { grid-template-columns: auto 1fr; }
+    .document-actions { grid-column: 1 / -1; }
     .grand-total { text-align: left; }
     .card { padding: 20px; }
     .table-wrap { margin-right: -20px; margin-left: -20px; }

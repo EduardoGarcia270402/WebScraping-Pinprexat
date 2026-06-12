@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
 
@@ -11,14 +11,17 @@ from database.connection import SessionLocal, init_db
 from database.repository import (
     get_cotizacion_by_id,
     get_cotizacion_by_numero,
+    get_documento_by_id,
     get_proceso_by_id,
     save_cotizacion,
+    save_especificaciones_pdf,
     save_proceso,
 )
 from parser.nco_parser import parse_nco_detail
+from parser.pdf_specs_parser import extract_pdf_specs
 from quotation.pdf_renderer import render_quotation_pdf
 from quotation.quotation_builder import build_quotation_data, generate_quotation_number
-from scheduler.job_runner import _extract_and_save_specs, _process_documentos_anexos
+from scraper.document_downloader import _is_especificaciones_tecnicas, download_document
 from scraper.drive_uploader import upload_to_drive
 from scraper.firecrawl_client import FirecrawlScraper
 
@@ -44,11 +47,13 @@ def create_app() -> Flask:
             if not parsed.get("codigo_necesidad"):
                 raise ValueError("No se encontro el codigo de necesidad en la pagina.")
 
-            _process_documentos_anexos(source_url, parsed)
+            parsed["documentos_anexos"] = _prepare_documentos(
+                source_url,
+                parsed.get("documentos_anexos"),
+            )
             with SessionLocal() as session:
                 result = save_proceso(session, parsed)
                 session.flush()
-                _extract_and_save_specs(session, result.proceso)
                 proceso_id = result.proceso.id
                 session.commit()
         except Exception as exc:
@@ -64,6 +69,52 @@ def create_app() -> Flask:
             if proceso is None:
                 abort(404)
             return render_template("quotation_form.html", proceso=proceso)
+
+    @app.get("/documentos/<int:documento_id>/descargar")
+    def download_attachment(documento_id: int):
+        settings = get_settings()
+        try:
+            with SessionLocal() as session:
+                documento = get_documento_by_id(session, documento_id)
+                if documento is None or not documento.download_url:
+                    abort(404)
+
+                proceso = documento.proceso
+                if not documento.ruta_local or not Path(documento.ruta_local).exists():
+                    result = download_document(
+                        page_url=documento.download_url,
+                        download_url=documento.download_url,
+                        descripcion=documento.descripcion_archivo or "Documento anexo",
+                        codigo_necesidad=proceso.codigo_necesidad,
+                        output_dir=settings.documents_dir,
+                    )
+                    for field, value in result.items():
+                        setattr(documento, field, value)
+
+                local_path = Path(documento.ruta_local)
+                if settings.drive_upload_enabled:
+                    drive_result = _upload_attachment(local_path, settings)
+                    for field, value in drive_result.items():
+                        setattr(documento, field, value)
+
+                if (
+                    local_path.suffix.lower() == ".pdf"
+                    and _is_especificaciones_tecnicas(documento.descripcion_archivo or "")
+                ):
+                    _update_specs_from_document(session, proceso, documento, local_path)
+
+                session.commit()
+                download_name = documento.nombre_archivo or local_path.name
+        except Exception as exc:
+            flash(f"No se pudo descargar el documento: {exc}", "error")
+            proceso_id = request.args.get("proceso_id", type=int)
+            return redirect(
+                url_for("edit_quotation", proceso_id=proceso_id)
+                if proceso_id
+                else url_for("index")
+            )
+
+        return send_file(local_path, as_attachment=True, download_name=download_name)
 
     @app.post("/cotizaciones/generar/<int:proceso_id>")
     def generate_quotation(proceso_id: int):
@@ -213,6 +264,29 @@ def _unique_quotation_number(session) -> str:
 
 
 def _upload_quotation(pdf_path: Path, settings) -> dict[str, str]:
+    return _upload_file(
+        pdf_path,
+        settings,
+        folder_name=settings.quotation_drive_folder_name,
+        folder_id=settings.quotation_drive_folder_id,
+    )
+
+
+def _upload_attachment(local_path: Path, settings) -> dict[str, str]:
+    return _upload_file(
+        local_path,
+        settings,
+        folder_name=settings.drive_folder_name,
+        folder_id=settings.drive_folder_id,
+    )
+
+
+def _upload_file(
+    local_path: Path,
+    settings,
+    folder_name: str,
+    folder_id: str | None,
+) -> dict[str, str]:
     credentials_file = (
         settings.drive_oauth_client_file
         if settings.drive_auth_mode == "oauth"
@@ -221,10 +295,10 @@ def _upload_quotation(pdf_path: Path, settings) -> dict[str, str]:
     if credentials_file is None:
         raise ValueError("Faltan las credenciales de Google Drive.")
     return upload_to_drive(
-        local_path=pdf_path,
+        local_path=local_path,
         credentials_file=credentials_file,
-        folder_name=settings.quotation_drive_folder_name,
-        folder_id=settings.quotation_drive_folder_id,
+        folder_name=folder_name,
+        folder_id=folder_id,
         auth_mode=settings.drive_auth_mode,
         token_file=settings.drive_oauth_token_file,
     )
@@ -233,3 +307,32 @@ def _upload_quotation(pdf_path: Path, settings) -> dict[str, str]:
 def _is_http_url(value: str) -> bool:
     parsed = urlparse(value)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _prepare_documentos(source_url: str, documentos: object) -> list[dict[str, object]]:
+    if not isinstance(documentos, list):
+        return []
+
+    prepared = []
+    for documento in documentos:
+        if not isinstance(documento, dict):
+            continue
+        download_url = documento.get("download_url")
+        if not isinstance(download_url, str) or not download_url.strip():
+            continue
+        prepared.append(
+            {
+                **documento,
+                "download_url": urljoin(source_url, download_url.strip()),
+            }
+        )
+    return prepared
+
+
+def _update_specs_from_document(session, proceso, documento, local_path: Path) -> None:
+    try:
+        specs_data = extract_pdf_specs(local_path)
+    except Exception:
+        return
+    specs_data["documento_anexo_id"] = documento.id
+    save_especificaciones_pdf(session, proceso, specs_data)

@@ -34,6 +34,9 @@ Cuando el encargado ingresa un enlace en la pantalla:
 Formulario web
 -> procesamiento inmediato de ese enlace
 -> carga del formulario de cotizacion
+-> visualizacion de todos los documentos anexos disponibles
+-> descarga manual del TDR o especificaciones tecnicas
+-> subida automatica del documento descargado a Google Drive
 -> revision e ingreso de precios
 -> generacion manual del PDF
 ```
@@ -41,6 +44,49 @@ Formulario web
 El enlace se utiliza una sola vez para preparar la cotizacion. No se agrega al archivo
 de monitoreo y no se vuelve a procesar por el scheduler, a menos que tambien se agregue
 manualmente a `urls/targets.txt`.
+
+## Documentos disponibles en el HUD
+
+Despues de cargar una URL, el formulario muestra una seccion `Documentos disponibles`
+con todos los anexos encontrados en la pagina de SERCOP.
+
+Cada documento presenta:
+
+- Descripcion publicada en SERCOP.
+- Nombre local, cuando ya fue descargado.
+- Estado de descarga.
+- Estado de carga en Google Drive.
+- Boton para descargar.
+- Enlace para abrir el archivo en Drive, cuando ya fue subido.
+
+Al presionar `Descargar`, el sistema:
+
+```text
+Obtiene el archivo desde SERCOP
+-> genera el nombre local normalizado
+-> guarda el archivo en DOCUMENTS_DIR
+-> sube el mismo archivo a la carpeta configurada de Google Drive
+-> guarda ruta local, nombre, ID y URL de Drive en documentos_anexos
+-> entrega el archivo al navegador
+```
+
+Para TDR o especificaciones tecnicas se conserva el formato de nombre existente:
+
+```text
+EspecificacionesTecnicas_<codigo_necesidad>.pdf
+```
+
+Si el archivo ya existe localmente, no se vuelve a descargar desde SERCOP. Al presionar
+el boton se verifica o actualiza su copia en Drive usando el mismo nombre.
+
+Cuando el documento descargado es un TDR o especificacion tecnica en PDF, tambien se
+actualiza la extraccion de plazo, garantia, validez y terminos que utiliza el formulario
+de cotizacion.
+
+Los procesos que fueron cargados antes de implementar esta funcionalidad pueden no tener
+la lista completa de anexos almacenada. Para recuperarla, se debe ingresar nuevamente su
+enlace de SERCOP en la pantalla inicial. El proceso se actualiza sin perder los metadatos
+locales o de Drive de los documentos que ya hayan sido descargados.
 
 ### Archivo `urls/targets.txt`
 
