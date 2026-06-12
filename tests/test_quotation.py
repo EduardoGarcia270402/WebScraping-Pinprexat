@@ -65,6 +65,44 @@ def test_build_quotation_data_combines_process_and_pdf_specs() -> None:
     assert data.fecha_limite_entrega == date(2026, 6, 10)
 
 
+def test_build_quotation_data_uses_manual_prices_and_calculates_subtotal() -> None:
+    proceso = Proceso(codigo_necesidad="NIC-002", nombre_entidad="Cliente")
+    proceso.items_compra = [
+        ItemCompra(
+            numero=1,
+            cpc="123",
+            descripcion_producto="Producto",
+            unidad="Unidad",
+            cantidad=Decimal("3"),
+        )
+    ]
+    settings = SimpleNamespace(
+        company_name="PINPREXAT",
+        company_ruc=None,
+        company_address=None,
+        company_phone=None,
+        company_email=None,
+    )
+
+    data = build_quotation_data(
+        proceso=proceso,
+        specs=None,
+        settings=settings,
+        item_values=[
+            {
+                "numero": 1,
+                "cantidad": "3",
+                "precio_unitario": "12.50",
+                "monto_total": "37.50",
+            }
+        ],
+    )
+
+    assert data.items[0].precio_unitario == Decimal("12.50")
+    assert data.items[0].monto_total == Decimal("37.50")
+    assert data.subtotal == Decimal("37.50")
+
+
 def test_render_quotation_pdf_creates_file(tmp_path) -> None:
     pytest.importorskip("reportlab")
 

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Cotizacion generada{% endblock %}
+{% block content %}
+<section class="success-card card">
+    <div class="success-mark">OK</div>
+    <p class="eyebrow">Proceso completado</p>
+    <h1>Cotizacion {{ cotizacion.numero_cotizacion }} generada</h1>
+    <p class="lead">Total registrado: $ {{ "{:,.2f}".format(cotizacion.subtotal or 0) }}</p>
+    <div class="actions centered">
+        <a class="secondary-button" href="{{ url_for('index') }}">Crear otra</a>
+        <a class="button" href="{{ url_for('download_quotation', cotizacion_id=cotizacion.id) }}" target="_blank">Abrir PDF</a>
+        {% if cotizacion.drive_url %}
+            <a class="button" href="{{ cotizacion.drive_url }}" target="_blank" rel="noopener">Abrir en Drive</a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

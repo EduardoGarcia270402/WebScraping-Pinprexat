@@ -161,10 +161,31 @@ class Cotizacion(Base):
     ruta_pdf: Mapped[str | None] = mapped_column(Text)
     drive_file_id: Mapped[str | None] = mapped_column(String)
     drive_url: Mapped[str | None] = mapped_column(Text)
+    subtotal: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     estado: Mapped[str] = mapped_column(String, nullable=False, default="generada")
     creado_en: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     proceso: Mapped[Proceso] = relationship(back_populates="cotizaciones")
+    items: Mapped[list[CotizacionItem]] = relationship(
+        back_populates="cotizacion",
+        cascade="all, delete-orphan",
+    )
+
+
+class CotizacionItem(Base):
+    __tablename__ = "cotizacion_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cotizacion_id: Mapped[int] = mapped_column(ForeignKey("cotizaciones.id"), nullable=False)
+    numero: Mapped[int | None] = mapped_column(Integer)
+    codigo: Mapped[str | None] = mapped_column(String)
+    descripcion: Mapped[str | None] = mapped_column(Text)
+    unidad: Mapped[str | None] = mapped_column(String)
+    cantidad: Mapped[Decimal | None] = mapped_column(Numeric)
+    precio_unitario: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    monto_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+    cotizacion: Mapped[Cotizacion] = relationship(back_populates="items")
 
 
 class EjecucionLog(Base):

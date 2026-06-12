@@ -175,19 +175,14 @@ def _process_cotizacion(session, proceso) -> None:
     if not settings.quotation_enabled:
         return
 
+    specs = _extract_and_save_specs(session, proceso)
+    if not settings.quotation_auto_generate:
+        logger.info("Quotation ready for manual review: {}", proceso.codigo_necesidad)
+        return
+
     latest_cotizacion = get_latest_cotizacion(session, proceso)
     if latest_cotizacion is not None and _should_skip_existing_cotizacion(latest_cotizacion, settings):
         return
-
-    specs = None
-    documento = _select_local_pdf_document(proceso.documentos_anexos)
-    if documento is not None and documento.ruta_local:
-        try:
-            specs_data = extract_pdf_specs(Path(documento.ruta_local))
-            specs_data["documento_anexo_id"] = documento.id
-            specs = save_especificaciones_pdf(session, proceso, specs_data)
-        except Exception as exc:
-            logger.warning("Specification PDF extraction failed for {}: {}", proceso.codigo_necesidad, exc)
 
     try:
         numero_cotizacion = _build_unique_quotation_number(session)
@@ -228,6 +223,21 @@ def _process_cotizacion(session, proceso) -> None:
         logger.info("Quotation generated for {}: {}", proceso.codigo_necesidad, pdf_path)
     except Exception as exc:
         logger.warning("Quotation generation failed for {}: {}", proceso.codigo_necesidad, exc)
+
+
+def _extract_and_save_specs(session, proceso):
+    specs = proceso.especificaciones_pdf
+    documento = _select_local_pdf_document(proceso.documentos_anexos)
+    if documento is None or not documento.ruta_local:
+        return specs
+
+    try:
+        specs_data = extract_pdf_specs(Path(documento.ruta_local))
+        specs_data["documento_anexo_id"] = documento.id
+        return save_especificaciones_pdf(session, proceso, specs_data)
+    except Exception as exc:
+        logger.warning("Specification PDF extraction failed for {}: {}", proceso.codigo_necesidad, exc)
+        return specs
 
 
 def _select_local_pdf_document(documentos: list[object]):

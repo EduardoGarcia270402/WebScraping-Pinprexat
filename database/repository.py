@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from database.models import (
     Cotizacion,
+    CotizacionItem,
     DocumentoAnexo,
     EjecucionLog,
     EspecificacionPDF,
@@ -55,6 +56,7 @@ COTIZACION_FIELDS = (
     "ruta_pdf",
     "drive_file_id",
     "drive_url",
+    "subtotal",
     "estado",
 )
 
@@ -83,9 +85,28 @@ def get_proceso_by_codigo(session: Session, codigo_necesidad: str) -> Proceso | 
     return session.scalars(statement).first()
 
 
+def get_proceso_by_id(session: Session, proceso_id: int) -> Proceso | None:
+    statement = (
+        select(Proceso)
+        .options(
+            selectinload(Proceso.funcionario),
+            selectinload(Proceso.lugar_entrega),
+            selectinload(Proceso.items_compra),
+            selectinload(Proceso.documentos_anexos),
+            selectinload(Proceso.especificaciones_pdf),
+        )
+        .where(Proceso.id == proceso_id)
+    )
+    return session.scalars(statement).first()
+
+
 def get_cotizacion_by_numero(session: Session, numero_cotizacion: str) -> Cotizacion | None:
     statement = select(Cotizacion).where(Cotizacion.numero_cotizacion == numero_cotizacion)
     return session.scalars(statement).first()
+
+
+def get_cotizacion_by_id(session: Session, cotizacion_id: int) -> Cotizacion | None:
+    return session.get(Cotizacion, cotizacion_id)
 
 
 def get_latest_cotizacion(session: Session, proceso: Proceso) -> Cotizacion | None:
@@ -145,9 +166,25 @@ def save_cotizacion(
     data: dict[str, Any],
 ) -> Cotizacion:
     cotizacion = Cotizacion(**_pick(data, COTIZACION_FIELDS))
+    cotizacion.items = [
+        CotizacionItem(
+            numero=item.get("numero"),
+            codigo=item.get("codigo"),
+            descripcion=item.get("descripcion"),
+            unidad=item.get("unidad"),
+            cantidad=_decimal_or_none(item.get("cantidad")),
+            precio_unitario=Decimal(str(item["precio_unitario"])),
+            monto_total=Decimal(str(item["monto_total"])),
+        )
+        for item in data.get("items") or []
+    ]
     proceso.cotizaciones.append(cotizacion)
     session.add(cotizacion)
     return cotizacion
+
+
+def _decimal_or_none(value: Any) -> Decimal | None:
+    return None if value is None or value == "" else Decimal(str(value))
 
 
 def _build_proceso(data: dict[str, Any]) -> Proceso:

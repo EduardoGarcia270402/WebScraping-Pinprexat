@@ -1,2 +1,1 @@
-# Agrega una URL de SERCOP por linea.
-https://compraspublicas.gob.ec/ProcesoContratacion/compras/NCO/NCORegistroDetalle.cpe?&id=MfpRSvRPpOJ4BwJ4EjZTfHkykKizHqGhidRXqJ-6dvU,&op=0
+https://compraspublicas.gob.ec/ProcesoContratacion/compras/NCO/NCORegistroDetalle.cpe?&id=zwvm5AVgVOO7bN6wu0mQfuDzeD5asmfa97ElAz7UMWk,&op=0

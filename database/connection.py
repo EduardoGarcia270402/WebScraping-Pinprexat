@@ -19,6 +19,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_document_specs_constraint()
+    _ensure_quotation_pricing_schema()
 
 
 def _ensure_document_specs_constraint() -> None:
@@ -40,6 +41,16 @@ def _ensure_document_specs_constraint() -> None:
                 "REFERENCES documentos_anexos(id) "
                 "ON DELETE SET NULL"
             )
+        )
+
+
+def _ensure_quotation_pricing_schema() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS subtotal NUMERIC(14, 2)")
         )
 
 

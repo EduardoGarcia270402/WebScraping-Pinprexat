@@ -152,6 +152,8 @@ def _items_table(data: QuotationData, styles: object) -> object:
         Paragraph("<b>Descripcion</b>", styles["Small"]),
         Paragraph("<b>Unidad</b>", styles["Small"]),
         Paragraph("<b>Cantidad</b>", styles["Small"]),
+        Paragraph("<b>P. unitario</b>", styles["Small"]),
+        Paragraph("<b>Total</b>", styles["Small"]),
     ]]
     for item in data.items:
         rows.append(
@@ -161,13 +163,25 @@ def _items_table(data: QuotationData, styles: object) -> object:
                 Paragraph(_escape(item.descripcion or "N/D"), styles["Small"]),
                 _escape(item.unidad or ""),
                 _format_decimal(item.cantidad),
+                _format_money(item.precio_unitario),
+                _format_money(item.monto_total),
             ]
         )
 
     if len(rows) == 1:
-        rows.append(["", "", Paragraph("Sin productos registrados", styles["Small"]), "", ""])
+        rows.append(["", "", Paragraph("Sin productos registrados", styles["Small"]), "", "", "", ""])
 
-    table = Table(rows, colWidths=[34, 82, 245, 70, 70], repeatRows=1)
+    rows.append([
+        "",
+        "",
+        "",
+        "",
+        Paragraph("<b>Subtotal</b>", styles["Small"]),
+        "",
+        Paragraph(f"<b>{_format_money(data.subtotal)}</b>", styles["Small"]),
+    ])
+
+    table = Table(rows, colWidths=[25, 62, 190, 55, 55, 65, 68], repeatRows=1)
     table.setStyle(
         TableStyle(
             [
@@ -179,6 +193,9 @@ def _items_table(data: QuotationData, styles: object) -> object:
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+                ("SPAN", (4, -1), (5, -1)),
+                ("BACKGROUND", (4, -1), (-1, -1), colors.whitesmoke),
             ]
         )
     )
@@ -189,6 +206,12 @@ def _format_decimal(value: Decimal | None) -> str:
     if value is None:
         return ""
     return f"{value:,.2f}"
+
+
+def _format_money(value: Decimal | None) -> str:
+    if value is None:
+        return ""
+    return f"$ {value:,.2f}"
 
 
 def _format_date(value: object | None) -> str | None:

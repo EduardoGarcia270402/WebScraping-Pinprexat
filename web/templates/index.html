@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Nueva cotizacion | PINPREXAT{% endblock %}
+{% block content %}
+<section class="hero">
+    <p class="eyebrow">Nueva cotizacion</p>
+    <h1>Carga una necesidad de SERCOP</h1>
+    <p class="lead">
+        Ingresa el enlace. El sistema obtendra los datos del proceso y luego podras revisar
+        la informacion, completar precios y generar el PDF.
+    </p>
+    <form class="url-form card" method="post" action="{{ url_for('load_url') }}">
+        <label for="url">Enlace de la necesidad</label>
+        <div class="url-row">
+            <input id="url" name="url" type="url" placeholder="https://..." required autofocus>
+            <button type="submit">Cargar informacion</button>
+        </div>
+        <p class="hint">La carga puede tardar mientras se consulta SERCOP y se procesa el anexo.</p>
+    </form>
+</section>
+{% endblock %}

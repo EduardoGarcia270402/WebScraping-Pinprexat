@@ -80,8 +80,21 @@ CREATE TABLE IF NOT EXISTS cotizaciones (
     ruta_pdf TEXT,
     drive_file_id VARCHAR,
     drive_url TEXT,
+    subtotal NUMERIC(14, 2),
     estado VARCHAR NOT NULL DEFAULT 'generada',
     creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cotizacion_items (
+    id SERIAL PRIMARY KEY,
+    cotizacion_id INTEGER NOT NULL REFERENCES cotizaciones(id) ON DELETE CASCADE,
+    numero INTEGER,
+    codigo VARCHAR,
+    descripcion TEXT,
+    unidad VARCHAR,
+    cantidad NUMERIC,
+    precio_unitario NUMERIC(14, 2) NOT NULL,
+    monto_total NUMERIC(14, 2) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ejecuciones_log (

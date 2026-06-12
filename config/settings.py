@@ -88,6 +88,7 @@ class Settings:
     drive_folder_id: str | None
     drive_folder_name: str
     quotation_enabled: bool
+    quotation_auto_generate: bool
     quotations_dir: Path
     quotation_regenerate_existing: bool
     quotation_drive_folder_id: str | None
@@ -150,6 +151,7 @@ def get_settings() -> Settings:
         drive_folder_id=_getenv("DRIVE_FOLDER_ID"),
         drive_folder_name=_getenv("DRIVE_FOLDER_NAME", "NecesidadesContratacion") or "NecesidadesContratacion",
         quotation_enabled=_getenv_bool("QUOTATION_ENABLED", True),
+        quotation_auto_generate=_getenv_bool("QUOTATION_AUTO_GENERATE", False),
         quotations_dir=BASE_DIR / (_getenv("QUOTATIONS_DIR", "downloads/cotizaciones") or "downloads/cotizaciones"),
         quotation_regenerate_existing=_getenv_bool("QUOTATION_REGENERATE_EXISTING", False),
         quotation_drive_folder_id=_getenv("QUOTATION_DRIVE_FOLDER_ID"),
